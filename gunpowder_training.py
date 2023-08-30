@@ -7,8 +7,9 @@ import multiprocessing
 # multiprocessing.set_start_method("fork")
 import gunpowder as gp
 import zarr
-from iohub import open_ome_zarr
+#from iohub import open_ome_zarr
 import matplotlib.pyplot as plt
+import numpy as np
 
 #%%
 
@@ -25,39 +26,40 @@ f = zarr.open(store_path, 'r')
 f['raw'].shape
 # f['ground_truth'].shape
 
+#%%
+f['raw'].dtype
 
 #%%
 
 # helper function to show image(s), channels first
-def imshow(raw, ground_truth=None, prediction=None):
-  rows = 1
-  if ground_truth is not None:
-    rows += 1
-  if prediction is not None:
-    rows += 1
-  cols = raw.shape[0] if len(raw.shape) > 3 else 1
-  fig, axes = plt.subplots(rows, cols, figsize=(10, 4), sharex=True, sharey=True, squeeze=False)
-  if len(raw.shape) == 3:
-    axes[0][0].imshow(raw.transpose(1, 2, 0))
-  else:
-    for i, im in enumerate(raw):
-      
-      axes[0][i].imshow(im.transpose(1, 2, 0))
-  row = 1
-  if ground_truth is not None:
-    if len(ground_truth.shape) == 3:
-      axes[row][0].imshow(ground_truth[0])
-    else:
-      for i, gt in enumerate(ground_truth):
-        axes[row][i].imshow(gt[0])
-    row += 1
-  if prediction is not None:
-    if len(prediction.shape) == 3:
-      axes[row][0].imshow(prediction[0])
-    else:
-      for i, gt in enumerate(prediction):
-        axes[row][i].imshow(gt[0])
-  plt.show()
+def imshow(raw, slice_index=0, ground_truth=None, prediction=None):
+    num_images = raw.shape[0]
+    rows = 1
+    if ground_truth is not None:
+        rows += 1
+    if prediction is not None:
+        rows += 1
+    cols = num_images
+
+    fig, axes = plt.subplots(rows, cols, figsize=(10, 4), sharex=True, sharey=True, squeeze=False)
+
+    for i in range(num_images):
+        # Select the specified slice (e.g., slice_index) for visualization
+        selected_slice = raw[i, slice_index]
+
+        axes[0][i].imshow(selected_slice, cmap='gray')  # Assuming grayscale images
+
+    row = 1
+    if ground_truth is not None:
+        for i in range(num_images):
+            axes[row][i].imshow(ground_truth[i][0], cmap='gray')  # Assuming ground_truth[i] is a single channel image
+        row += 1
+
+    if prediction is not None:
+        for i in range(num_images):
+            axes[row][i].imshow(prediction[i][0], cmap='gray')  # Assuming prediction[i] is a single channel image
+
+    plt.show()
 #%%
 imshow(f['raw'])
 # imshow(zarr.open('20230811_raw.zarr')['raw'][:])

@@ -4,12 +4,66 @@ import logging
 import math
 import torch
 import multiprocessing
-multiprocessing.set_start_method("fork")
+# multiprocessing.set_start_method("fork")
 import gunpowder as gp
+import zarr
+from iohub import open_ome_zarr
+import matplotlib.pyplot as plt
+
+#%%
+
+#%%
+# img_path = '/mnt/efs/shared_data/hack/data/20230811/raw/'
+# mask_path = '/mnt/efs/shared_data/hack/data/20230811/fixed_labels/'
+store_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
+
+# img_list = os.listdir(img_path)
+gt_string = '_deconvolved_rho_0.0038_gamma_0.013_m2_Manual_Mask.tiff'
+
+f = zarr.open(store_path, 'r')
+#%%
+f['raw'].shape
+# f['ground_truth'].shape
 
 
 #%%
 
+# helper function to show image(s), channels first
+def imshow(raw, ground_truth=None, prediction=None):
+  rows = 1
+  if ground_truth is not None:
+    rows += 1
+  if prediction is not None:
+    rows += 1
+  cols = raw.shape[0] if len(raw.shape) > 3 else 1
+  fig, axes = plt.subplots(rows, cols, figsize=(10, 4), sharex=True, sharey=True, squeeze=False)
+  if len(raw.shape) == 3:
+    axes[0][0].imshow(raw.transpose(1, 2, 0))
+  else:
+    for i, im in enumerate(raw):
+      
+      axes[0][i].imshow(im.transpose(1, 2, 0))
+  row = 1
+  if ground_truth is not None:
+    if len(ground_truth.shape) == 3:
+      axes[row][0].imshow(ground_truth[0])
+    else:
+      for i, gt in enumerate(ground_truth):
+        axes[row][i].imshow(gt[0])
+    row += 1
+  if prediction is not None:
+    if len(prediction.shape) == 3:
+      axes[row][0].imshow(prediction[0])
+    else:
+      for i, gt in enumerate(prediction):
+        axes[row][i].imshow(gt[0])
+  plt.show()
+#%%
+imshow(f['raw'])
+# imshow(zarr.open('20230811_raw.zarr')['raw'][:])
+
+# imshow(f, ground_truth=f['ground_truth'][:], prediction=f['ground_truth'][:])
+#%%
 logging.basicConfig(level=logging.INFO)
 
 num_training_images = 100

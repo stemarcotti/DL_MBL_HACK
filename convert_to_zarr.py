@@ -32,6 +32,7 @@ for file in range(n_files):
     # add dimension to get TZYX
     z,y,x = zyx.shape
     tzyx = np.expand_dims(zyx, axis=0)
+    gt = np.expand_dims(gt, axis=0)
     # crop if needed
     if (y > crop_size and x > crop_size):
         tzyx = tzyx[:, 0:z, int(y/2 - crop_size//2) : int(y/2 + crop_size//2), 

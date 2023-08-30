@@ -24,8 +24,8 @@ gt = gp.ArrayKey('GROUND_TRUTH')
 source = gp.ZarrSource(
     zarr_file,
     {
-      raw: 'raw',
-      gt: 'ground_truth'
+      raw: 'fov0/raw',
+      gt: 'fov0/gt'
     },
     {
       raw: gp.ArraySpec(interpolatable=True, voxel_size=(1,1)),
@@ -43,7 +43,7 @@ intensity_augment = gp.IntensityAugment(
   shift_max=0.2)
 noise_augment = gp.NoiseAugment(raw)
 
-
+stack = gp.Stack(5)
 
 request = gp.BatchRequest()
 request[raw] = gp.Roi((0, 0), (150, 150))
@@ -52,7 +52,8 @@ request[gt] = gp.Roi((0, 0), (150, 150))
 pipeline = (
   source +
   normalize +
-  random_location)
+  random_location +
+  stack)
 
 with gp.build(pipeline):
   batch = pipeline.request_batch(request)
@@ -102,7 +103,7 @@ padding = 'same'
 out_channels = 3
 activation = torch.nn.Softmax(dim=1)
 loss_fn = torch.nn.CrossEntropyLoss()
-dtype = torch.LongTensor
+#dtype = torch.LongTensor
 final_kernel_size = 1
 
 unet = UNet(in_channels=1,
@@ -125,7 +126,7 @@ summary(net)
 # %%
 # create new array key for the network output
 prediction = gp.ArrayKey('PREDICTION')
-
+unsqueeze = gp.Unsqueeze([raw, gt], axis=0)
 # create a train node using our model, loss, and optimizer
 train = gp.torch.Train(
   net,
@@ -148,11 +149,70 @@ pipeline = (
   source +
   normalize +
   random_location +
-  stack +
   train)
 
 request[prediction] = gp.Roi((0,0), (150, 150))
 
 with gp.build(pipeline):
    batch = pipeline.request_batch(request)
+# %%
+from funlib.learn.torch.models import UNet, ConvPass
+
+# make sure we all see the same
+torch.manual_seed(18)
+
+unet = UNet(
+  in_channels=3,
+  num_fmaps=4,
+  fmap_inc_factor=2,
+  downsample_factors=[[2, 2], [2, 2]],
+  kernel_size_down=[[[3, 3], [3, 3]]]*3,
+  kernel_size_up=[[[3, 3], [3, 3]]]*2,
+  padding='same')
+
+model = torch.nn.Sequential(
+  unet,
+  ConvPass(4, 1, [(1, 1)], activation=None),
+  torch.nn.Sigmoid())
+
+loss = torch.nn.BCELoss()
+
+optimizer = torch.optim.Adam(model.parameters())
+# %%
+# create new array key for the network output
+prediction = gp.ArrayKey('PREDICTION')
+
+# create a train node using our model, loss, and optimizer
+train = gp.torch.Train(
+  model,
+  loss,
+  optimizer,
+  inputs = {
+    'input': raw
+  },
+  loss_inputs = {
+    0: prediction,
+    1: gt
+  },
+  outputs = {
+    0: prediction
+  })
+
+pipeline = (
+  source +
+  normalize +
+  random_location +
+  simple_augment +
+  intensity_augment +
+  noise_augment +
+  stack +
+  train)
+
+# add the prediction to the request
+request[prediction] = gp.Roi((0, 0), (150, 150))
+
+with gp.build(pipeline):
+  batch = pipeline.request_batch(request)
+
+#imshow(batch[raw].data, batch[gt].data, batch[prediction].data)
 # %%

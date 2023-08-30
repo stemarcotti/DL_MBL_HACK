@@ -41,11 +41,13 @@ for file in range(n_files):
     if file == 0:
         # f = zarr.open(store_path, 'w')
         f['raw'] = tzyx
-        f['raw'].attrs['resolution'] = (1, 1) # check
+        f['raw'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
         f['ground_truth'] = gt
-        f['ground_truth'].attrs['resolution'] = (1, 1) # check
+        f['ground_truth'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
     else:
         f['raw'].append(tzyx, axis=0)
-        f['gt'].append(gt, axis=0)
+        f['ground_truth'].append(gt, axis=0)
 
 
+
+# %%

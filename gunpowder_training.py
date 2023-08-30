@@ -132,4 +132,4 @@ def train_until(max_iterations):
 
 if __name__ == '__main__':
 
-    train_until(1000)
+    train_until(500)

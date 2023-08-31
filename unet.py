@@ -153,7 +153,7 @@ request[raw] = gp.Roi((0,0,0), (1,128,128))
 request[prediction] = gp.Roi((0, 0, 0), ( 1, 128, 128))
 request[affinities] = gp.Roi((0,0,0), (1, 128, 128))
 with gp.build(pipeline):
-   for i in range(1000):
+   for i in range(10000):
      batch = pipeline.request_batch(request)
 print(batch[affinities].data.shape)
 print(batch[prediction].data.shape)

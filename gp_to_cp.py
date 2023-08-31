@@ -1,40 +1,27 @@
 
 #%%
-#import time, os
 from scipy.ndimage import maximum_filter1d, find_objects
 import torch
 import numpy as np
-#import tifffile
 from tqdm import trange
 from numba import njit, float32, int32, vectorize
-#import cv2
-#import fastremap
 import gunpowder as gp
 import math
 import zarr
-#import imageio
 import matplotlib.pyplot as plt
-
-#import logging
 from cellpose import dynamics
-# dynamics_logger = logging.getLogger(__name__)
-
-#from cellpose import utils, metrics, transforms
 
 import torch
 from torch import optim, nn
-# from torch import resnet_torch
 TORCH_ENABLED = True 
 torch_GPU = torch.device('cuda')
 torch_CPU = torch.device('cpu')
 
 #%%
-
 # This loads the zarr file
 load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
 f = zarr.open(load_path, 'r')
 f['fov0/raw'].shape
-
 
 #%%
 
@@ -46,7 +33,6 @@ maskexpand = np.expand_dims(mask, axis=0)
 maskoutput = dynamics.masks_to_flows(maskexpand)
 
 #%%
-
 class maskstocellpose_flows(gp.BatchFilter):
 
   def __init__(self, in_array, out_array):
@@ -92,7 +78,6 @@ class maskstocellpose_flows(gp.BatchFilter):
     return batch
   #%%
 
-
   # declare a new array key for inverted raw
 flows_array = gp.ArrayKey('FLOW')
 raw = gp.ArrayKey('RAW')
@@ -122,12 +107,11 @@ noise_augment = gp.NoiseAugment(raw)
 
 pad_raw = gp.Pad(raw, None)
 pad_gt = gp.Pad(gt, 0)
-#pad_flows_array = gp.Pad(flows_array,0)
+
 
 #%%
 
 # Gunpowder pipeline
-
 source = tuple(gp.ZarrSource(
     load_path,
     {

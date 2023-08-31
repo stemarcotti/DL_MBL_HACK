@@ -133,6 +133,12 @@ optimizer = torch.optim.Adam(net.parameters())
 from torchsummary import summary
 summary(net)
 # %%
+# add affinities
+affinities = gp.ArrayKey('AFFINITIES')
+add_affinities = gp.AddAffinities([[0,0,1],[0,1,0], [1,0,0]], gt, affinities)
+#add_affinities = gp.AddAffinities([[(0,1), (1,0)],[(0,1), (1,0)], [(0,1), (1,0)]], gt, affinities)
+
+#%%
 # create new array key for the network output
 prediction = gp.ArrayKey('PREDICTION')
 unsqueeze = gp.Unsqueeze([raw, gt], axis=0)
@@ -157,8 +163,9 @@ squeeze = gp.Squeeze([raw], axis=0)
 pipeline = (
   source +
   normalize_raw +
-  normalize_labels +
   random_location +
+  add_affinities + 
+  normalize_labels +
   stack +
   #unsqueeze +
   train)

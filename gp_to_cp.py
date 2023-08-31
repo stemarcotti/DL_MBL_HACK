@@ -1,21 +1,21 @@
 
 #%%
-import time, os
+#import time, os
 from scipy.ndimage import maximum_filter1d, find_objects
 import torch
 import numpy as np
-import tifffile
+#import tifffile
 from tqdm import trange
 from numba import njit, float32, int32, vectorize
-import cv2
-import fastremap
+#import cv2
+#import fastremap
 import gunpowder as gp
 import math
 import zarr
-import imageio
+#import imageio
 import matplotlib.pyplot as plt
 
-import logging
+#import logging
 from cellpose import dynamics
 # dynamics_logger = logging.getLogger(__name__)
 
@@ -77,6 +77,7 @@ class maskstocellpose_flows(gp.BatchFilter):
     # create the array spec for the new array
     spec = batch[self.in_array].spec.copy()
     spec.roi = request[self.out_array].roi.copy()
+    spec.dtype = np.float32 
 
     # create a new batch to hold the new array
     batch = gp.Batch()
@@ -121,7 +122,7 @@ noise_augment = gp.NoiseAugment(raw)
 
 pad_raw = gp.Pad(raw, None)
 pad_gt = gp.Pad(gt, 0)
-pad_flows_array = gp.Pad(flows_array,0)
+#pad_flows_array = gp.Pad(flows_array,0)
 
 #%%
 
@@ -138,26 +139,34 @@ source = tuple(gp.ZarrSource(
         voxel_size=(1,1)),
       gt: gp.ArraySpec(interpolatable=False,
         voxel_size=(1,1)),
-    }) + normalize + pad_raw + pad_gt + pad_flows_array +random_location for i in [1])
+    }) + normalize + pad_raw + pad_gt  +random_location for i in [1])
 #%%
 
 
 ## Got here - need to build in our pipeline there
-pipeline = (
-  source +
-  normalize +
-  random_location +
-  maskstocellpose_flows(in_array=gt, out_array=flows_array))
+pipeline = source
+pipeline += gp.RandomProvider()
+pipeline += simple_augment
+pipeline += elastic_augment
+pipeline += intensity_augment
+pipeline += noise_augment
+pipeline += maskstocellpose_flows(in_array=gt, out_array=flows_array)
+  
 
 request = gp.BatchRequest()
 request[raw] = gp.Roi((0, 0), (128, 128))
 request[gt] = gp.Roi((0, 0), (128, 128))
+request[flows_array] = gp.Roi((0, 0), (128, 128))
 
 with gp.build(pipeline):
   batch = pipeline.request_batch(request)
 
-#imshow(batch[raw].data, batch[inverted_raw].data)
+
 
 print(batch[raw].data.shape)
 print(batch[gt].data.shape)
+print(batch[flows_array].data.shape)
+# %%
+
+plt.imshow(batch[flows_array].data[1,0])
 # %%

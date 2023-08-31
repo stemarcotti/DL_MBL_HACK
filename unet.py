@@ -12,7 +12,7 @@ import zarr
 from skimage import data
 from skimage import filters
 import logging
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 #%%
 folder_path = '/mnt/efs/shared_data/hack/data/20230811/'
 zarr_file = folder_path+'20230811_raw.zarr'
@@ -33,7 +33,9 @@ source = gp.ZarrSource(
       gt: gp.ArraySpec(interpolatable=False, voxel_size=(1,1,1))
     })
 # %%
-normalize = gp.Normalize(raw)
+#normalize = gp.Normalize(raw)
+normalize_raw = gp.Normalize(raw)
+normalize_labels = gp.Normalize(gt, factor=1.0/255.0)
 random_location = gp.RandomLocation()
 simple_augment = gp.SimpleAugment()
 intensity_augment = gp.IntensityAugment(
@@ -50,11 +52,11 @@ request = gp.BatchRequest()
 # request[raw] = gp.Roi((0, 0), (150, 150))
 # request[gt] = gp.Roi((0, 0), (150, 150))
 
-pipeline = (
-  source +
-  normalize +
-  random_location +
-  stack)
+# pipeline = (
+#   source +
+#   normalize +
+#   random_location +
+#   stack)
 
 # with gp.build(pipeline):
 #   batch = pipeline.request_batch(request)
@@ -125,6 +127,7 @@ final_conv = torch.nn.Conv2d(
     kernel_size=final_kernel_size)
 
 net = torch.nn.Sequential(unet, final_conv, activation)
+net.train()
 optimizer = torch.optim.Adam(net.parameters())
 # %%
 from torchsummary import summary
@@ -153,7 +156,8 @@ stack = gp.Stack(5)
 squeeze = gp.Squeeze([raw], axis=0)
 pipeline = (
   source +
-  normalize +
+  normalize_raw +
+  normalize_labels +
   random_location +
   stack +
   #unsqueeze +

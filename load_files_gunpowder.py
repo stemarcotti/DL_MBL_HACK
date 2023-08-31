@@ -8,37 +8,20 @@ import gunpowder as gp
 import os
 import numpy as np
 import tifffile as tiff
-
-
-#%%
 from funlib.learn.torch.models import UNet, ConvPass
 import logging
 import math
 import torch
 import multiprocessing
-# multiprocessing.set_start_method("fork")
-import gunpowder as gp
-import zarr
-# from iohub import open_ome_zarr
-import matplotlib.pyplot as plt
-import math
 #%%
-
-#%%
-#%%
-#%%
-store_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
-
-# img_list = os.listdir(img_path)
-#gt_string = '_deconvolved_rho_0.0038_gamma_0.013_m2_Manual_Mask.tiff'
-
-f = zarr.open(store_path, 'r')
-#%%
+# This loads the zarr file
+load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
+f = zarr.open(load_path, 'r')
 f['fov0/raw'].shape
+
 #%%
-
-
-# helper function to show image(s), channels first
+# helper function to show images. 
+# TODO: make this useful for different cases
 def imshow(raw, slice_index=0, ground_truth=None, prediction=None):
     num_images = 1
     rows = 1
@@ -63,7 +46,9 @@ def imshow(raw, slice_index=0, ground_truth=None, prediction=None):
 
     plt.show()
 
-#%%
+#%% 
+# Show the raw data and the ground truth
+
 imshow(f['fov0/raw'], ground_truth = f['fov0/gt'], slice_index = 30)
 
 #%%
@@ -73,6 +58,7 @@ raw = gp.ArrayKey('RAW')
 gt = gp.ArrayKey('GROUND_TRUTH')
 
 #%%
+# This are the parameters for the augmentations we are using in the gunpowder pipeline
 
 random_location = gp.RandomLocation()
 simple_augment = gp.SimpleAugment()
@@ -96,10 +82,10 @@ pad_raw = gp.Pad(raw, None)
 pad_gt = gp.Pad(gt, 0)
 
 #%%
+# Gunpowder pipeline
 
-# Make this 'pipeline' thingy
 source = tuple(gp.ZarrSource(
-    store_path,
+    load_path,
     {
       raw: f'fov{i}/raw',
       gt: f'fov{i}/gt'
@@ -112,7 +98,7 @@ source = tuple(gp.ZarrSource(
     }) + normalize + pad_raw + pad_gt + random_location for i in [1])
 
 
-# pipeline = source + random_location + simple_augment + elastic_augment + intensity_augment + noise_augment
+# This is the pipeline we are using
 pipeline = source
 pipeline += gp.RandomProvider()
 pipeline += simple_augment
@@ -126,8 +112,8 @@ pipeline += noise_augment
 
 # formulate a request for "raw"
 request = gp.BatchRequest()
-request[raw] = gp.Roi((0,0), (128, 128))
-request[gt] = gp.Roi((0,0), (128, 128))
+request[raw] = gp.Roi((0,0), (256, 256))
+request[gt] = gp.Roi((0,0), (256, 256))
 
 # build the pipeline...
 with gp.build(pipeline):
@@ -141,6 +127,7 @@ print(f"batch returned: {batch}")
 imshow(batch[raw].data, ground_truth=batch[gt].data, slice_index = 12)
 
 #%%
-
+# Test to check whether the shape of the output batch is correct
 print(batch[raw].data.shape)
-# %%
+print(batch[gt].data.shape)
+print("Well done you, you completed the gunpowder augmentations!")

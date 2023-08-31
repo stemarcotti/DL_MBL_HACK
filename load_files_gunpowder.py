@@ -22,7 +22,9 @@ import zarr
 # from iohub import open_ome_zarr
 import matplotlib.pyplot as plt
 import math
+#%%
 
+#%%
 #%%
 #%%
 store_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'

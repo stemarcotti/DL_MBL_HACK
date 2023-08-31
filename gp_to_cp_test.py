@@ -13,7 +13,7 @@ from cellpose import dynamics
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 import torch
 from torch import optim, nn
@@ -63,12 +63,24 @@ class maskstocellpose_flows(gp.BatchFilter):
 
     # take the masks and compute the flows
     if self.is_2D:
+      print('Before squeezing, the shape is')
+      print(batch[self.in_array].data.shape)
       squeezedmask = np.squeeze(batch[self.in_array].data)
-      flows = dynamics.masks_to_flows(squeezedmask)
+      print('After squeezing, the shape is')
+      print(squeezedmask.shape)
+      #make squeezedmask into a list of 2D masks
+      squeezedmask = list(squeezedmask)
+      # flows = dynamics.masks_to_flows(squeezedmask)
+      flows = dynamics.labels_to_flows(squeezedmask)
+      print('After calculating flows, the type is')
+      print(type(flows))
       flows = np.expand_dims(flows, axis = 2)
-      print('Vibes, the flows are 3D>2D>3D')
+      print('After expanding dims, the shape is')
+      print(flows[0].shape)
+      # print('Vibes, the flows are 3D>2D>3D')
     else:
-      flows = dynamics.masks_to_flows(batch[self.in_array].data)
+      # flows = dynamics.masks_to_flows(batch[self.in_array].data)
+      flows = dynamics.labels_to_flows(batch[self.in_array].data)
 
 
     # create the array spec for the new array
@@ -147,13 +159,13 @@ pipeline += elastic_augment
 pipeline += stack
 pipeline += intensity_augment
 pipeline += noise_augment
-# pipeline += maskstocellpose_flows(in_array=gt, out_array=flows_array, is_2D = True)
+pipeline += maskstocellpose_flows(in_array=gt, out_array=flows_array, is_2D = True)
   
 
 request = gp.BatchRequest()
 request[raw] = gp.Roi((0, 0, 0), (1, 128, 128))
 request[gt] = gp.Roi((0, 0, 0), (1, 128, 128))
-# request[flows_array] = gp.Roi((0, 0, 0), (1, 128, 128))
+request[flows_array] = gp.Roi((0, 0, 0), (1, 128, 128))
 
 with gp.build(pipeline):
   batch = pipeline.request_batch(request)
@@ -162,7 +174,7 @@ with gp.build(pipeline):
 
 print(batch[raw].data.shape)
 print(batch[gt].data.shape)
-# print(batch[flows_array].data.shape)
+print(batch[flows_array].data.shape)
 # %%
 
 # plt.imshow(batch[flows_array].data[1,0])

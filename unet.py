@@ -36,6 +36,7 @@ source = gp.ZarrSource(
 #normalize = gp.Normalize(raw)
 normalize_raw = gp.Normalize(raw)
 normalize_labels = gp.Normalize(gt, factor=1.0/255.0)
+
 random_location = gp.RandomLocation()
 simple_augment = gp.SimpleAugment()
 intensity_augment = gp.IntensityAugment(
@@ -66,36 +67,6 @@ request = gp.BatchRequest()
 # for i in range(5):
 #   ax[i].imshow(batch[gt].data[i,32])
 # %%
-def model_step(model, loss_fn, optimizer, feature, label, activation, prediction_type=None, train_step=True):
-    
-    # zero gradients if training
-    if train_step:
-        optimizer.zero_grad()
-    
-    # forward - pass data through model to get logits
-    logits = model(feature)
-    
-    if prediction_type == "three_class":
-        label=torch.squeeze(label,1)
-        
-    # pass logits through final activation to get predictions
-    predicted = activation(logits)
-
-    # pass predictions through loss, compare to ground truth
-    loss_value = loss_fn(input=predicted, target=label)
-    
-    # if training mode, backprop and optimizer step
-    if train_step:
-        loss_value.backward()
-        optimizer.step()
-
-    # return outputs and loss
-    outputs = {
-        'pred': predicted,
-        'logits': logits,
-    }
-    
-    return loss_value, outputs
 #%%
 in_channels = 1
 num_fmaps = 12
@@ -104,9 +75,10 @@ downsample_factors = [[2,2],[2,2]]
 kernel_sizes = [[(3,3), (3,3)],[(3,3), (3,3)], [(3,3), (3,3)]]
 padding = 'same'
 
-out_channels = 1
-activation = torch.nn.Softmax(dim=1)
-loss_fn = torch.nn.CrossEntropyLoss()
+out_channels = 2
+activation = torch.nn.Sigmoid()
+#loss_fn = torch.nn.CrossEntropyLoss()
+loss_fn = torch.nn.MSELoss()
 #dtype = torch.LongTensor
 final_kernel_size = 1
 
@@ -126,16 +98,20 @@ final_conv = torch.nn.Conv2d(
     out_channels=out_channels,
     kernel_size=final_kernel_size)
 
-net = torch.nn.Sequential(unet, final_conv, activation)
-net.train()
+net = torch.nn.Sequential(unet,
+                          final_conv,
+                          activation,
+                          torch.nn.Unflatten(1, torch.Size([out_channels,1])))
+net.train(True)
 optimizer = torch.optim.Adam(net.parameters())
 # %%
-from torchsummary import summary
-summary(net)
+# from torchsummary import summary
+# summary(net)
 # %%
 # add affinities
 affinities = gp.ArrayKey('AFFINITIES')
-add_affinities = gp.AddAffinities([[0,0,1],[0,1,0], [1,0,0]], gt, affinities)
+add_affinities = gp.AddAffinities([[0,0,1],[0,1,0]], gt, affinities, dtype=np.float32)
+normalize_affs = gp.Normalize(affinities, 1.0, dtype=np.float32)
 #add_affinities = gp.AddAffinities([[(0,1), (1,0)],[(0,1), (1,0)], [(0,1), (1,0)]], gt, affinities)
 
 #%%
@@ -152,7 +128,7 @@ train = gp.torch.Train(
   },
   loss_inputs = {
     0: prediction,
-    1: gt
+    1: affinities
   },
   outputs = {
     0: prediction
@@ -165,14 +141,28 @@ pipeline = (
   normalize_raw +
   random_location +
   add_affinities + 
-  normalize_labels +
+  #normalize_affs +
+  #gp.Normalize(affinities)+
+  #normalize_labels +
   stack +
   #unsqueeze +
-  train)
+  train
+  )
 request[gt] = gp.Roi((0,0,0), (1,128,128))
 request[raw] = gp.Roi((0,0,0), (1,128,128))
 request[prediction] = gp.Roi((0, 0, 0), ( 1, 128, 128))
+request[affinities] = gp.Roi((0,0,0), (1, 128, 128))
 with gp.build(pipeline):
-   batch = pipeline.request_batch(request)
+   for i in range(1000):
+     batch = pipeline.request_batch(request)
+print(batch[affinities].data.shape)
+print(batch[prediction].data.shape)
 # %
+# %%
+fig,ax = plt.subplots(1,5)
+for i in range(5):
+  #ax[i].imshow(batch[affinities].data[i,1,0])
+  ax[i].imshow(batch[prediction].data[i,1,0])
+#plt.imshow(batch[prediction].data[0][0])
+plt.show()
 # %%

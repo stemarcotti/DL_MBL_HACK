@@ -9,18 +9,19 @@ from skimage import data
 from skimage import filters
 
 #%%
-img_path = '/mnt/efs/shared_data/hack/data/20230504/raw/'
-mask_path = '/mnt/efs/shared_data/hack/data/20230504/fixed_labels/'
-store_path = '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr'
+img_path = '/mnt/efs/shared_data/hack/data/20230811/raw/'
+mask_path = '/mnt/efs/shared_data/hack/data/20230811/fixed_labels/'
+store_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
 
 img_list = os.listdir(img_path)
-gt_string = '_m2_rho0.001_gamma0.001_Manual_Mask.tiff'
+gt_string = '_deconvolved_rho_0.0038_gamma_0.013_m2_Manual_Mask.tiff'
 n_files = len(img_list)
 #%%
 f = zarr.group()
 for i in range(n_files):
     f.create_group(f'fov{i}/raw')
     f.create_group(f'fov{i}/gt')
+    f.create_group(f'fov{i}/fg_mask')
 # %%
 
 crop_size = 640
@@ -44,7 +45,9 @@ for file in range(n_files):
     f[f'fov{file}/raw'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
     f[f'fov{file}/gt'] = gt
     f[f'fov{file}/gt'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
-
+    f[f'fov{file}/fg_mask'] = (gt>0).astype('uint8')
+    f[f'fov{file}/fg_mask'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
+    os.system(f"chmod -R 777 {store_path}")
 # %%
 
 # %%

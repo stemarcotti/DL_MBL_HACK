@@ -11,7 +11,8 @@ import random
 import zarr
 from skimage import data
 from skimage import filters
-
+import logging
+logging.basicConfig(level=logging.DEBUG)
 #%%
 folder_path = '/mnt/efs/shared_data/hack/data/20230811/'
 zarr_file = folder_path+'20230811_raw.zarr'
@@ -28,8 +29,8 @@ source = gp.ZarrSource(
       gt: 'fov0/gt'
     },
     {
-      raw: gp.ArraySpec(interpolatable=True, voxel_size=(1,1)),
-      gt: gp.ArraySpec(interpolatable=False, voxel_size=(1,1))
+      raw: gp.ArraySpec(interpolatable=True, voxel_size=(1,1,1)),
+      gt: gp.ArraySpec(interpolatable=False, voxel_size=(1,1,1))
     })
 # %%
 normalize = gp.Normalize(raw)
@@ -46,8 +47,8 @@ noise_augment = gp.NoiseAugment(raw)
 stack = gp.Stack(5)
 
 request = gp.BatchRequest()
-request[raw] = gp.Roi((0, 0), (150, 150))
-request[gt] = gp.Roi((0, 0), (150, 150))
+# request[raw] = gp.Roi((0, 0), (150, 150))
+# request[gt] = gp.Roi((0, 0), (150, 150))
 
 pipeline = (
   source +
@@ -55,13 +56,13 @@ pipeline = (
   random_location +
   stack)
 
-with gp.build(pipeline):
-  batch = pipeline.request_batch(request)
+# with gp.build(pipeline):
+#   batch = pipeline.request_batch(request)
 
 # %%
-fig,ax = plt.subplots(1,5)
-for i in range(5):
-  ax[i].imshow(batch[gt].data[i,32])
+# fig,ax = plt.subplots(1,5)
+# for i in range(5):
+#   ax[i].imshow(batch[gt].data[i,32])
 # %%
 def model_step(model, loss_fn, optimizer, feature, label, activation, prediction_type=None, train_step=True):
     
@@ -98,19 +99,24 @@ in_channels = 1
 num_fmaps = 12
 fmap_inc_factors = 2
 downsample_factors = [[2,2],[2,2]]
+kernel_sizes = [[(3,3), (3,3)],[(3,3), (3,3)], [(3,3), (3,3)]]
 padding = 'same'
 
-out_channels = 3
+out_channels = 1
 activation = torch.nn.Softmax(dim=1)
 loss_fn = torch.nn.CrossEntropyLoss()
 #dtype = torch.LongTensor
 final_kernel_size = 1
 
-unet = UNet(in_channels=1,
-           num_fmaps=6,
-           fmap_inc_factor=2,
+unet = UNet(in_channels=in_channels,
+           num_fmaps=num_fmaps,
+           fmap_inc_factor=fmap_inc_factors,
+           kernel_size_down=kernel_sizes,
+           kernel_size_up=kernel_sizes[:-1],
            downsample_factors=downsample_factors,
-           padding='same'
+           padding=padding,
+           fov=(1,1),
+           voxel_size=(1,1)
           )
 
 final_conv = torch.nn.Conv2d(
@@ -144,75 +150,18 @@ train = gp.torch.Train(
   })
 
 stack = gp.Stack(5)
-
+squeeze = gp.Squeeze([raw], axis=0)
 pipeline = (
   source +
   normalize +
   random_location +
+  stack +
+  #unsqueeze +
   train)
-
-request[prediction] = gp.Roi((0,0), (150, 150))
-
+request[gt] = gp.Roi((0,0,0), (1,128,128))
+request[raw] = gp.Roi((0,0,0), (1,128,128))
+request[prediction] = gp.Roi((0, 0, 0), ( 1, 128, 128))
 with gp.build(pipeline):
    batch = pipeline.request_batch(request)
-# %%
-from funlib.learn.torch.models import UNet, ConvPass
-
-# make sure we all see the same
-torch.manual_seed(18)
-
-unet = UNet(
-  in_channels=3,
-  num_fmaps=4,
-  fmap_inc_factor=2,
-  downsample_factors=[[2, 2], [2, 2]],
-  kernel_size_down=[[[3, 3], [3, 3]]]*3,
-  kernel_size_up=[[[3, 3], [3, 3]]]*2,
-  padding='same')
-
-model = torch.nn.Sequential(
-  unet,
-  ConvPass(4, 1, [(1, 1)], activation=None),
-  torch.nn.Sigmoid())
-
-loss = torch.nn.BCELoss()
-
-optimizer = torch.optim.Adam(model.parameters())
-# %%
-# create new array key for the network output
-prediction = gp.ArrayKey('PREDICTION')
-
-# create a train node using our model, loss, and optimizer
-train = gp.torch.Train(
-  model,
-  loss,
-  optimizer,
-  inputs = {
-    'input': raw
-  },
-  loss_inputs = {
-    0: prediction,
-    1: gt
-  },
-  outputs = {
-    0: prediction
-  })
-
-pipeline = (
-  source +
-  normalize +
-  random_location +
-  simple_augment +
-  intensity_augment +
-  noise_augment +
-  stack +
-  train)
-
-# add the prediction to the request
-request[prediction] = gp.Roi((0, 0), (150, 150))
-
-with gp.build(pipeline):
-  batch = pipeline.request_batch(request)
-
-#imshow(batch[raw].data, batch[gt].data, batch[prediction].data)
+# %
 # %%

@@ -177,5 +177,5 @@ print(batch[gt].data.shape)
 print(batch[flows_array].data.shape)
 # %%
 
-# plt.imshow(batch[flows_array].data[1,0])
+plt.imshow(batch[flows_array].data[1,3,0]) #flows outputs batch, flowsx4=mask, distancetransform, flowy, flowx.
 # %%

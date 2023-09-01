@@ -68,7 +68,7 @@ def prepare_gunpowder_pipeline(load_path, output_shape=(30, 128, 128), device='c
     pipeline += gp.RandomProvider()
     pipeline += simple_augment
     pipeline += elastic_augment
-    pipeline += stack
+    # pipeline += stack
     pipeline += intensity_augment
     pipeline += noise_augment
     

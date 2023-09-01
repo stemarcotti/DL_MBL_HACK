@@ -14,15 +14,19 @@ def process_zarr_data(load_path, output_shape=(30, 128, 128), stack_size=5,  dev
     raw = gp.ArrayKey('RAW')
     gt = gp.ArrayKey('GROUND_TRUTH')
 
-    #Define paramters
+    ########  Define paramters ########
+
+    # How many stacks to request
+    stack = gp.Stack(stack_size)
+
+    # random sampeling 
     random_location = gp.RandomLocation()
+
+    # geometric augmentation
     simple_augment = gp.SimpleAugment(
     mirror_probs = [0,0,0],
     transpose_probs = [0,0,0])
     
-    # How many stacks to request
-    stack = gp.Stack(stack_size)
-
     elastic_augment = gp.ElasticAugment(
     control_point_spacing=(30, 30, 30),
     jitter_sigma=(1.0, 1.0, 1.0),
@@ -30,18 +34,23 @@ def process_zarr_data(load_path, output_shape=(30, 128, 128), stack_size=5,  dev
     spatial_dims = 3
     )
 
-    normalize_raw = gp.Normalize(raw)
-    normalize_gt = gp.Normalize(gt, factor=1.0/255.0)
-    
+    # signal augmentations
     intensity_augment = gp.IntensityAugment(
     raw,
     scale_min=0.9,
     scale_max=1.1,
     shift_min=-0.01,
     shift_max=0.01)
+
     noise_augment = gp.NoiseAugment(raw, mode='poisson')
 
-    # Gunpowder pipeline
+    normalize_raw = gp.Normalize(raw)
+    normalize_gt = gp.Normalize(gt, factor=1.0/255.0)
+
+
+    ##### Gunpowder pipeline #####
+
+    # Load the data
     source = tuple(gp.ZarrSource(
     load_path,
     {

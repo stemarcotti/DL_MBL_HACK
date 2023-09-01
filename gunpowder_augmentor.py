@@ -39,7 +39,7 @@ def process_zarr_data(load_path, output_shape=(30, 128, 128), stack_size=5,  dev
     scale_max=1.1,
     shift_min=-0.01,
     shift_max=0.01)
-    noise_augment = gp.NoiseAugment([0,1])
+    noise_augment = gp.NoiseAugment(raw, mode='poisson')
 
     # Gunpowder pipeline
     source = tuple(gp.ZarrSource(
@@ -63,7 +63,7 @@ def process_zarr_data(load_path, output_shape=(30, 128, 128), stack_size=5,  dev
     pipeline += elastic_augment
     pipeline += stack
     pipeline += intensity_augment
-    #pipeline += noise_augment
+    pipeline += noise_augment
     
 
     # Define a batch request

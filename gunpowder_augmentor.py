@@ -90,27 +90,7 @@ def prepare_gunpowder_pipeline(
 # %%
 
 # %%
-# Define keys
-# raw = gp.ArrayKey('RAW')
-# gt = gp.ArrayKey('GROUND_TRUTH')
-# fg = gp.ArrayKey('FOREGROUND')
 
-# request = gp.BatchRequest()
-# request[raw] = gp.Roi((0, 0, 0), output_shape)
-# request[gt] = gp.Roi((0, 0, 0), output_shape)
-# request[fg] = gp.Roi((0,0,0), output_shape)
-
-# with gp.build(pipeline):
-#     batch = pipeline.request_batch(request)
-# # Build the pipeline and request the batch
-# with gp.build(pipeline):
-#   batch = pipeline.request_batch(request)
-
-
-# # Move the batch data to the specified device
-# if device == 'cuda':
-#     batch[raw].data = torch.from_numpy(batch[raw].data).cuda()
-#     batch[gt].data = torch.from_numpy(batch[gt].data).cuda()
 
 # Example usage:
 # load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'

@@ -91,8 +91,8 @@ def prepare_gunpowder_pipeline(load_path,
     # Define a batch request
     request = gp.BatchRequest()
     request[raw] = gp.Roi((0, 0, 0), output_shape)
-    request[gt] = gp.Roi((0, 0, 0), output_shape)
-    request[fg] = gp.Roi((0,0,0), output_shape)
+    request[gt]  = gp.Roi((0, 0, 0), output_shape)
+    request[fg]  = gp.Roi((0, 0, 0), output_shape)
 
     return pipeline, request
     

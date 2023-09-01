@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 
 
-def process_zarr_data(load_path, output_shape=(128, 128), device='cuda'):
+def process_zarr_data(load_path, output_shape=(30, 128, 128), stack_size=5,  device='cuda'):
     # Open the zarr file
     f = zarr.open(load_path, 'r')
 
@@ -16,22 +16,30 @@ def process_zarr_data(load_path, output_shape=(128, 128), device='cuda'):
 
     #Define paramters
     random_location = gp.RandomLocation()
-    simple_augment = gp.SimpleAugment()
-    stack = gp.Stack(5)
+    simple_augment = gp.SimpleAugment(
+    mirror_probs = [0,0,0],
+    transpose_probs = [0,0,0])
+    
+    # How many stacks to request
+    stack = gp.Stack(stack_size)
 
     elastic_augment = gp.ElasticAugment(
-    control_point_spacing=(20, 20),
-    jitter_sigma=(1.0, 1.0),
-    rotation_interval=(0, math.pi/2))
+    control_point_spacing=(30, 30, 30),
+    jitter_sigma=(1.0, 1.0, 1.0),
+    rotation_interval=(0, math.pi/2),
+    spatial_dims = 3
+    )
 
-    normalize = gp.Normalize(raw)
+    normalize_raw = gp.Normalize(raw)
+    normalize_gt = gp.Normalize(gt, factor=1.0/255.0)
+    
     intensity_augment = gp.IntensityAugment(
     raw,
-    scale_min=0.8,
-    scale_max=1.2,
-    shift_min=-0.2,
-    shift_max=0.2)
-    noise_augment = gp.NoiseAugment(raw)
+    scale_min=0.9,
+    scale_max=1.1,
+    shift_min=-0.01,
+    shift_max=0.01)
+    noise_augment = gp.NoiseAugment([0,1])
 
     # Gunpowder pipeline
     source = tuple(gp.ZarrSource(
@@ -42,14 +50,11 @@ def process_zarr_data(load_path, output_shape=(128, 128), device='cuda'):
     },
     {
       raw: gp.ArraySpec(interpolatable=True,
-        voxel_size=(1,1)),
+        voxel_size=(1,1,1)),
       gt: gp.ArraySpec(interpolatable=False,
-        voxel_size=(1,1)),
-    }) + normalize + random_location for i in [1]) 
+        voxel_size=(1,1,1)),
+    })  + normalize_raw + normalize_gt + random_location for i in [1]) 
 
-    normalize = gp.Normalize(raw)
-    pad_raw = gp.Pad(raw, None)
-    pad_gt = gp.Pad(gt, 0)
 
     # Create the pipeline
     pipeline = source
@@ -58,13 +63,13 @@ def process_zarr_data(load_path, output_shape=(128, 128), device='cuda'):
     pipeline += elastic_augment
     pipeline += stack
     pipeline += intensity_augment
-    pipeline += noise_augment
+    #pipeline += noise_augment
     
 
     # Define a batch request
     request = gp.BatchRequest()
-    request[raw] = gp.Roi((0, 0), output_shape)
-    request[gt] = gp.Roi((0, 0), output_shape)
+    request[raw] = gp.Roi((0, 0, 0), output_shape)
+    request[gt] = gp.Roi((0, 0, 0), output_shape)
 
     # Build the pipeline and request the batch
     with gp.build(pipeline):
@@ -78,14 +83,15 @@ def process_zarr_data(load_path, output_shape=(128, 128), device='cuda'):
     return batch
 
 # Example usage:
-load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
-output_shape = (128, 128)
-device = 'cuda'  # Change to 'cpu' if you want to use CPU
-result_batch = process_zarr_data(load_path, output_shape, device)
+#load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
+#output_shape = (15, 128, 128)
+#stack_size = 7  # Adjust the stack size as needed
+#device = 'cuda'  # Change to 'cpu' if you want to use CPU
+#result_batch = process_zarr_data(load_path, output_shape, stack_size, device)
 
 #print(result_batch[raw].data.shape)
 #print(result_batch[gt].data.shape)
 
    # Print the shape of the 'raw' data
-print(result_batch[gp.ArrayKey('RAW')].data.shape)
-print(result_batch[gp.ArrayKey('GROUND_TRUTH')].data.shape)
+#print("Raw shape: " + str(result_batch[gp.ArrayKey('RAW')].data.shape))
+#print("Ground truth shape: " + str(result_batch[gp.ArrayKey('GROUND_TRUTH')].data.shape))

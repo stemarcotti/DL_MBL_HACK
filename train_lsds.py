@@ -93,9 +93,9 @@ def main():
     # Config for data
     load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
              '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
-    fov_list = [[0,1,2,3], [1,2,3]]
+    fov_list = [[0,1,2], [1,2,3]]
     output_shape = gp.Coordinate((16, 256, 256))
-    stack_size = 1
+    stack_size = 5
     voxels = gp.Coordinate((250, 75, 75))  
 
     # Array keys
@@ -119,12 +119,12 @@ def main():
     # geometric augmentation
     simple_augment = gp.SimpleAugment(mirror_probs=[0, 0, 0], transpose_probs=[0, 0, 0])
 
-    # elastic_augment = gp.ElasticAugment(
-    #     control_point_spacing=(30, 30, 30),
-    #     jitter_sigma=(1.0, 1.0, 1.0),
-    #     rotation_interval=(0, math.pi / 2),
-    #     spatial_dims=3,
-    # )
+    elastic_augment = gp.ElasticAugment(
+        control_point_spacing=(30, 30, 30),
+        jitter_sigma=(1.0, 1.0, 1.0),
+        rotation_interval=(0, math.pi / 2),
+        spatial_dims=3,
+    )
 
     # signal augmentations
     intensity_augment = gp.IntensityAugment(
@@ -191,7 +191,7 @@ def main():
     pipeline += normalize_raw
     pipeline += random_location
     pipeline += simple_augment
-    #pipeline += elastic_augment
+    pipeline += elastic_augment
     pipeline += intensity_augment
     pipeline += noise_augment
     pipeline += gp.Reject(mask=fg, min_masked=0.1)

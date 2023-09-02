@@ -11,7 +11,8 @@ from lsd.train.gp import AddLocalShapeDescriptor
 from gunpowder.torch import Train
 from torchsummary import summary
 
-logging.basicConfig(level=logging.DEBUG)
+
+logging.basicConfig(level=logging.INFO)
 
 class MtlsdModel(torch.nn.Module):
 
@@ -23,7 +24,8 @@ class MtlsdModel(torch.nn.Module):
         downsample_factors,
         kernel_size_down,
         kernel_size_up,
-        constant_upsample):
+        constant_upsample,
+        padding="same"):
   
         super().__init__()
 
@@ -36,7 +38,7 @@ class MtlsdModel(torch.nn.Module):
           kernel_size_down=kernel_size_down,
           kernel_size_up=kernel_size_up,
           constant_upsample=constant_upsample,
-          padding="same")
+          padding=padding)
 
         # create lsd and affs heads
         self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
@@ -94,8 +96,8 @@ def main():
     load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
              '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
     fov_list = [[0,1,2], [1,2,3]]
-    output_shape = gp.Coordinate((16, 256, 256))
-    stack_size = 5
+    output_shape = gp.Coordinate((20, 128, 128))
+    stack_size = 16
     voxels = gp.Coordinate((250, 75, 75))  
 
     # Array keys
@@ -171,9 +173,12 @@ def main():
                     fg: gp.ArraySpec(interpolatable=False, voxel_size=voxels),
                 },
             )
+             + gp.Normalize(raw) + gp.RandomLocation()
             for fov in fovs
         )
-        source = source
+        #source = source
+        #source += normalize_raw
+        #source += gp.RandomLocation()
         if i == 0:
             sources = source
         else:
@@ -188,10 +193,10 @@ def main():
     sources += gp.RandomProvider()  
     # Create the pipeline
     pipeline = sources
-    pipeline += normalize_raw
-    pipeline += random_location
+    #pipeline += normalize_raw
+    #pipeline += random_location
     pipeline += simple_augment
-    pipeline += elastic_augment
+    #pipeline += elastic_augment
     pipeline += intensity_augment
     pipeline += noise_augment
     pipeline += gp.Reject(mask=fg, min_masked=0.1)
@@ -204,10 +209,16 @@ def main():
 
     pipeline += stack
 
+    #pipeline += gp.PreCache(num_workers=20, cache_size=60)
+
     pipeline += Train(
         model,
         loss,
         optimizer,
+        log_dir = '/mnt/efs/shared_data/hack/lsd/lsd_exp1/logs/',
+        log_every = 1,
+        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/lsd_exp1/first_try",
+        save_every = 100, 
         inputs={
             'input': raw
         },
@@ -224,37 +235,55 @@ def main():
             5: affs_weights
         })
 
-
-    request = gp.BatchRequest()
-    request[raw] = gp.Roi((0, 0, 0), output_shape*voxels)
-    request[gt] = gp.Roi((0, 0, 0), output_shape*voxels)
-    request[fg] = gp.Roi((0, 0, 0), output_shape*voxels)
-    request[gt_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
-    request[lsds_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-    request[pred_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
-    request[gt_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
-    request[affs_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-    request[pred_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
-
-    
+    pipeline += gp.Snapshot({
+            raw: "raw",
+            gt: "gt",
+            gt_affs: 'gt_affinities',
+            pred_affs: 'pred_affinities',
+            fg:  "fg_mask"
+        },
+        dataset_dtypes={
+            gt: np.uint64,
+            gt_affs: np.float32
+        },
+        every=50,
+        output_filename='/mnt/efs/shared_data/hack/lsd/lsd_exp1/snapshot/batch_{iteration}.zarr')
+        #additional_request=snapshot_request)
+    pipeline += gp.PrintProfilingStats(every=5)
+ 
 
 
     # Build pipeline with training loop 
     with gp.build(pipeline):
-        batch = pipeline.request_batch(request)
+        for i in range(20):
+            request = gp.BatchRequest()
+            request[raw] = gp.Roi((0, 0, 0), output_shape*voxels)
+            request[gt] = gp.Roi((0, 0, 0), output_shape*voxels)
+            request[fg] = gp.Roi((0, 0, 0), output_shape*voxels)
+            request[gt_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request[lsds_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request[pred_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request[gt_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request[affs_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request[pred_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
+            batch = pipeline.request_batch(request)
+            snapshot_request = gp.BatchRequest({
+                gt_affs: request[gt_affs]
+                })
 
+            
 
 def get_model():
     # Configure model, loss, etc
     in_channels=1
     num_fmaps=12
     fmap_inc_factor=5
-    ds_fact = [(2,2,2),(2,2,2)]
+    ds_fact = [(1,2,2),(1,2,2)]
     num_levels = len(ds_fact) + 1
-    ksd = [[(3,3,3), (3,3,3)]]*num_levels
-    ksu = [[(3,3,3), (3,3,3)]]*(num_levels - 1)
+    ksd = [[(1,3,3), (1,3,3)],[(3,3,3), (3,3,3)],[(3,3,3), (3,3,3)]]
+    ksu = [[(3,3,3), (3,3,3)], [(3,3,3), (3,3,3)]]
     constant_upsample = True
-
+    padding="same"
     model = MtlsdModel(
         in_channels,
         num_fmaps,
@@ -262,15 +291,23 @@ def get_model():
         ds_fact,
         ksd,
         ksu,
-        constant_upsample)
+        constant_upsample,
+        padding=padding)
     
     loss = WeightedMSELoss()
     optimizer = torch.optim.Adam(lr=0.5e-4, params=model.parameters())
 
     return model, loss, optimizer
 
+
+
 if __name__ == "__main__":
     main()
     #model, loss, optimizer = get_model()
-    #summary(model, (1, 16,  256, 256))
+    #inp = torch.randn(1,1,20,128,128)
+    #print(inp.shape)
+    #out1,out2 = model(inp)
+    #print(out1.shape, out2.shape)
+    # print(out.shape)
+    # summary(model.cuda(), (1, 20,  128, 128))
 

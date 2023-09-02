@@ -35,7 +35,8 @@ class MtlsdModel(torch.nn.Module):
           downsample_factors=downsample_factors,
           kernel_size_down=kernel_size_down,
           kernel_size_up=kernel_size_up,
-          constant_upsample=constant_upsample)
+          constant_upsample=constant_upsample,
+          padding="same")
 
         # create lsd and affs heads
         self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
@@ -93,8 +94,8 @@ def main():
     load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
              '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
     fov_list = [[0,1,2,3], [1,2,3]]
-    output_shape = gp.Coordinate((16, 128, 128))
-    stack_size = 2
+    output_shape = gp.Coordinate((16, 256, 256))
+    stack_size = 1
     voxels = gp.Coordinate((250, 75, 75))  
 
     # Array keys
@@ -146,7 +147,7 @@ def main():
         [0, -1, 0],
         [-1, 0, 0],
         [0, 0, -1]],
-        labels=gt, #labels
+        labels=gt,
         affinities=gt_affs,
         dtype=np.float32)
     
@@ -178,6 +179,11 @@ def main():
         else:
             sources = sources + source
 
+
+
+    # Configure model, loss, etc
+    model, loss, optimizer = get_model()
+
     # Assemble pipeline 
     sources += gp.RandomProvider()  
     # Create the pipeline
@@ -193,7 +199,30 @@ def main():
     pipeline += shape_node
     pipeline += affinity_node
     pipeline += balance_node
+    
+    pipeline += gp.Unsqueeze([raw])
+
     pipeline += stack
+
+    pipeline += Train(
+        model,
+        loss,
+        optimizer,
+        inputs={
+            'input': raw
+        },
+        outputs={
+            0: pred_lsds,
+            1: pred_affs
+        },
+        loss_inputs={
+            0: pred_lsds,
+            1: gt_lsds,
+            2: lsds_weights,
+            3: pred_affs,
+            4: gt_affs,
+            5: affs_weights
+        })
 
 
     request = gp.BatchRequest()
@@ -202,14 +231,12 @@ def main():
     request[fg] = gp.Roi((0, 0, 0), output_shape*voxels)
     request[gt_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
     request[lsds_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-    #request[pred_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
+    request[pred_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
     request[gt_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
     request[affs_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-    #request[pred_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
+    request[pred_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
 
-    # Configure model, loss, etc
-    model, loss, optimizer = get_model()
-
+    
 
 
     # Build pipeline with training loop 
@@ -243,7 +270,7 @@ def get_model():
     return model, loss, optimizer
 
 if __name__ == "__main__":
-    # main()
-    model, loss, optimizer = get_model()
-    summary(model, (16, 128, 128))
+    main()
+    #model, loss, optimizer = get_model()
+    #summary(model, (1, 16,  256, 256))
 

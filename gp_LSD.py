@@ -19,7 +19,7 @@ from lsd.train.gp import AddLocalShapeDescriptor
 from gunpowder.torch import Train
 
 # %matplotlib inline
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 from gunpowder_augmentor import prepare_gunpowder_pipeline
 
 
@@ -103,7 +103,7 @@ def prepare_gunpowder_pipeline(load_path, output_shape=(30, 128, 128), device='c
         gt_lsds,
         lsds_mask=lsds_weights,
         sigma=1500,
-        downsample=1)
+        downsample=2)
     
     
     pipeline += gp.AddAffinities(
@@ -121,27 +121,27 @@ def prepare_gunpowder_pipeline(load_path, output_shape=(30, 128, 128), device='c
     request[raw] = gp.Roi((0, 0, 0), output_shape*voxels)
     request[gt] = gp.Roi((0, 0, 0), output_shape*voxels)
     request[gt_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
-    # request[lsds_weights]= gp.Roi((0, 0, 0), output_shape)
+    request[lsds_weights]= gp.Roi((0, 0, 0), output_shape*voxels) ## Added
     request[gt_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
     # request.add(gt_lsds, gp.Roi((0, 0, 0), output_shape))
 
     return pipeline, request
     
-load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
-output_shape = (20, 265, 265)
-stack_size = 6
-device = 'cpu'
+# load_path = '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr'
+# output_shape = (20, 265, 265)
+# stack_size = 6
+# device = 'cpu'
 
-pipeline, request = prepare_gunpowder_pipeline(load_path, output_shape, device) #stack_size 
+# pipeline, request = prepare_gunpowder_pipeline(load_path, output_shape, device) #stack_size 
 
 
-# Build the pipeline and request the batch
-with gp.build(pipeline):
-    batch = pipeline.request_batch(request)
+# # Build the pipeline and request the batch
+# with gp.build(pipeline):
+#     batch = pipeline.request_batch(request)
 
-# Move the batch data to the specified device
-if device == 'cuda':
-    batch[raw].data = torch.from_numpy(batch[raw].data).cuda()
-    batch[gt].data = torch.from_numpy(batch[gt].data).cuda()
-
+# # Move the batch data to the specified device
+# if device == 'cuda':
+#     batch[raw].data = torch.from_numpy(batch[raw].data).cuda()
+#     batch[gt].data = torch.from_numpy(batch[gt].data).cuda()
+#%%
 # Make some plots to check the data

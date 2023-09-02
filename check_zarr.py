@@ -2,7 +2,7 @@ import zarr
 
 load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
              '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
-fov_list = [[0,1,2,3], [1,2,3]]
+fov_list = [[0,1,2,3,4], [0,1,2,3]]
 
 
 for i, path in enumerate(load_path):

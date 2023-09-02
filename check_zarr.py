@@ -1,16 +1,29 @@
+import os
 import zarr
+import glob
 
-load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
-             '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
-fov_list = [[0,1,2,3,4], [0,1,2,3]]
+directory_path = '/mnt/efs/shared_data/hack/data/'
 
+# Use glob to recursively find all .zarr files
+all_files = glob.glob(os.path.join(directory_path, '**', '*.zarr'), recursive=True)
 
-for i, path in enumerate(load_path):
-        print(path)
-        fovs = fov_list[i]
-        print(f"fovs:{fovs}")
-        print(i)
-        f= zarr.open(path, "r")
-        for k in fovs:
-                print(k)
-                print(f[f"fov{k}/gt"].info)
+for path in all_files:
+    try:
+        f = zarr.open(path, "r")
+    except ValueError:
+        print(f"Error: Unable to open zarr file at {path}")
+        continue
+
+    print(f"\nChecking zarr file: {path}")
+
+    # Dynamically determine fov numbers by examining keys in the zarr file.
+    fovs = set([key.split('/')[0] for key in f.keys() if "fov" in key])
+
+    for fov in sorted(fovs):
+        for key_name in ["gt", "raw", "fg_mask"]:
+            full_key = f"{fov}/{key_name}"
+            try:
+                dtype = f[full_key].dtype
+                print(f"FOV: {fov.replace('fov', '')}, Key: {key_name}, Dtype: {dtype}")
+            except KeyError:
+                print(f"Error: Key '{full_key}' not found in {path}")

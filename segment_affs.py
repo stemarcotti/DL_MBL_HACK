@@ -245,7 +245,7 @@ axes[1][1].imshow(f['gt_affinities'][batch_idx, 1, z_slice], cmap='viridis')
 axes[1][1].set_title("GT Affinity 2")
 axes[1][2].imshow(f['gt_affinities'][batch_idx, 2, z_slice], cmap='viridis')
 axes[1][2].set_title("GT Affinity 3")
-axes[1][3].imshow(np.sum(f['gt_affinities'][0, :, z_slice], axis=0), cmap='viridis')
+axes[1][3].imshow(np.sum(f['gt_affinities'][batch_idx, :, z_slice], axis=0), cmap='viridis')
 axes[1][3].set_title("GT Affinities Summed")
 
 # 3rd row: Pred affinities (3 channels)

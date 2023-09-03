@@ -27,6 +27,11 @@ np.random.seed(42)
 lbl_cmap = random_label_cmap()
 
 #%%
+# to run this you need to have an environment with stardist!
+# the easiest way to do so is to create an environment from yml
+# the yml can be found in the stardist repo (either clone or copy the yml locally)
+# mamba env create -f stardist/extras/cuda_setup_conda/stardist_cuda_11.0.yml -n stardist
+#%%
 # load test data
 in_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902'
 
@@ -42,3 +47,5 @@ Y_pred = list(map(imread,Y_pred))
 # compute stats
 stats = matching_dataset(Y, Y_pred, thresh=0.7)
 print(stats)
+
+# %%

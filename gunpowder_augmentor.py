@@ -8,7 +8,7 @@ import torch
 
 
 def prepare_gunpowder_pipeline(
-    load_path, fov_list, output_shape=(30, 128, 128), device="cuda"
+    load_path, fov_list, output_shape=(20, 128, 128), device="cuda"
 ):  # stack_size=5
     # Define keys
     raw = gp.ArrayKey("RAW")
@@ -27,8 +27,8 @@ def prepare_gunpowder_pipeline(
     simple_augment = gp.SimpleAugment(mirror_probs=[0, 0, 0], transpose_probs=[0, 0, 0])
 
     elastic_augment = gp.ElasticAugment(
-        control_point_spacing=(30, 30, 30),
-        jitter_sigma=(1.0, 1.0, 1.0),
+        control_point_spacing=(7, 30, 30),
+        jitter_sigma=(1.0, 6.0, 6.0),
         rotation_interval=(0, math.pi / 2),
         spatial_dims=3,
     )

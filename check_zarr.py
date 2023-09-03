@@ -26,5 +26,6 @@ for path in all_files:
                 dtype = f[full_key].dtype
                 print(f"FOV: {fov.replace('fov', '')}, Key: {key_name}, Dtype: {dtype}")
                 print(f"CHUNKS: {f[full_key].chunks}")
+                print(f"SHAPE: {f[full_key].shape}")
             except KeyError:
                 print(f"Error: Key '{full_key}' not found in {path}")

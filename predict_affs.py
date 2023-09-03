@@ -1,3 +1,4 @@
+#%%
 import gunpowder as gp
 import h5py
 import io
@@ -32,11 +33,12 @@ total_roi = gp.Coordinate((64, 640, 640))*voxel_size
 stack_size = 16
 
 
-model = get_model()
-loss = WeightedMSELoss()
+# model = get_model()
+# loss = WeightedMSELoss()
 
 
 def predict(checkpoint, raw_file, raw_dataset):
+    logging.basicConfig(level=logging.DEBUG)
     raw = gp.ArrayKey("RAW")
     pred_affs = gp.ArrayKey("PRED_AFFS")
 
@@ -48,14 +50,15 @@ def predict(checkpoint, raw_file, raw_dataset):
     context = (input_size - output_size) / 2
 
     source = gp.ZarrSource(
-        raw_file, {raw: raw_dataset}, {raw: gp.ArraySpec(interpolatable=True)}
+        raw_file, {raw: raw_dataset}, {raw: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)}
     )
 
     with gp.build(source):
+        # print(source.spec[raw])
         total_input_roi = source.spec[raw].roi
         total_output_roi = source.spec[raw].roi.grow(-context, -context)
 
-    model = MtlsdModel()
+    model, _, _ = get_model()
 
     # set model to eval mode
     model.eval()
@@ -79,20 +82,21 @@ def predict(checkpoint, raw_file, raw_dataset):
     pipeline += gp.Unsqueeze([raw])
 
     # raw shape = c,h,w
-
+    #pipeline += gp.Unsqueeze([raw])
     pipeline += gp.Stack(1)
 
     # raw shape = b,c,h,w
 
+
     pipeline += predict
     pipeline += scan
-    pipeline += gp.Squeeze([raw])
+    # pipeline += gp.Squeeze([raw])
 
-    # raw shape = c,h,w
-    # pred_lsds shape = b,c,h,w
-    # pred_affs shape = b,c,h,w
+    # # raw shape = c,h,w
+    # # pred_lsds shape = b,c,h,w
+    # # pred_affs shape = b,c,h,w
 
-    pipeline += gp.Squeeze([raw, pred_affs])
+    # pipeline += gp.Squeeze([raw, pred_affs])
 
     # raw shape = h,w
     # pred_lsds shape = c,h,w
@@ -101,24 +105,37 @@ def predict(checkpoint, raw_file, raw_dataset):
     predict_request = gp.BatchRequest()
 
     # this lets us know to process the full image. we will scan over it until it is done
+    #predict_request.add(raw, input_size)
+    # predict_request.add(pred_affs, output_size)
     predict_request.add(raw, total_input_roi.get_end())
     predict_request.add(pred_affs, total_output_roi.get_end())
-
     with gp.build(pipeline):
         batch = pipeline.request_batch(predict_request)
 
     return batch[raw].data, batch[pred_affs].data
 
 
+#%% 
 
-
-snap_dir = "/mnt/efs/shared_data/hack/lsd/aff_exp2/snapshot"
-
-f = zarr.open(os.path.join(snap_dir, "newbatch_1251.zarr"), "r")
-
-checkpoint = f
+checkpoint = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs_checkpoint_2400"
 raw_file = "/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr"
-raw_dataset = "fov3/raw"
+raw_dataset = "fov2/raw"
 
 raw, pred_affs = predict(checkpoint, raw_file, raw_dataset)
 
+#%%
+
+
+fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(20, 6),
+            sharex=True,
+            sharey=True,
+            squeeze=False)
+
+# view predictions (for lsds we will just view the mean offset component)
+axes[0][0].imshow(raw, cmap='gray')
+axes[0][1].imshow(np.squeeze(pred_affs[0]), cmap='jet')
+
+# %%

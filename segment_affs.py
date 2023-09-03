@@ -19,10 +19,11 @@ from skimage.transform import resize
 logging.basicConfig(level=logging.INFO)
 
 
+
 # %%
 snap_dir = "/mnt/efs/shared_data/hack/lsd/aff_exp2/snapshot"
 
-f = zarr.open(os.path.join(snap_dir, "newbatch_951.zarr"), "r")
+f = zarr.open(os.path.join(snap_dir, "newbatch_1251.zarr"), "r")
 
 
 #%%
@@ -171,9 +172,9 @@ def get_segmentation(affinities, threshold):
 # Make segmentations
 pred_affs = f["pred_affinities"][batch_idx]
 
-ws_affs = np.stack([np.zeros_like(pred_affs[0]), pred_affs[0], pred_affs[1]])
+ws_affs = np.stack([pred_affs[0], pred_affs[1], pred_affs[2]], axis=0)
 
-threshold = 0.5
+threshold = 0.8
 segmentation = get_segmentation(ws_affs, threshold)
 
 
@@ -188,7 +189,7 @@ print("Shape of 'cropped raw':", cropped_raw.shape)
 # %%
 # Plotting the predictions and the segmentation
 
-z_slice = 1  # example Z slice for visualization
+z_slice = 2  # example Z slice for visualization
 
 fig, axes = plt.subplots(4, 4, figsize=(20, 20), sharex=True, sharey=True)
 

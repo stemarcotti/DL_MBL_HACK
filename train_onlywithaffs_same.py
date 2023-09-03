@@ -41,7 +41,7 @@ class MtlsdModel(torch.nn.Module):
           padding=padding)
 
         # create lsd and affs heads
-        self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
+        # self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
         self.aff_head = ConvPass(num_fmaps, 3, [[1, 1, 1]], activation='Sigmoid')
 
     def forward(self, input):
@@ -50,21 +50,45 @@ class MtlsdModel(torch.nn.Module):
         z = self.unet(input)
 
         # pass output through heads
-        lsds = self.lsd_head(z)
+        # lsds = self.lsd_head(z)
         affs = self.aff_head(z)
 
-        return lsds, affs
+        return affs
 
+
+# class WeightedMSELoss(torch.nn.MSELoss):
+#     def __init__(self):
+#         super(WeightedMSELoss, self).__init__()
+
+#     def _calc_loss(self, pred, target, weights):
+
+#         scaled = weights * (pred - target) ** 2
+
+#         if len(torch.nonzero(scaled)) != 0:
+#             mask = torch.masked_select(scaled, torch.gt(weights, 0))
+#             loss = torch.mean(mask)
+
+#         else:
+#             loss = torch.mean(scaled)
+
+#         return loss
+
+####
+
+# we can train now (example using pytorch)
+# first, create a custom MSE Loss with weighting
 
 class WeightedMSELoss(torch.nn.MSELoss):
+
     def __init__(self):
         super(WeightedMSELoss, self).__init__()
 
-    def _calc_loss(self, pred, target, weights):
+    def forward(self, prediction, target, weights):
 
-        scaled = weights * (pred - target) ** 2
+        scaled = (weights * (prediction - target) ** 2)
 
         if len(torch.nonzero(scaled)) != 0:
+
             mask = torch.masked_select(scaled, torch.gt(weights, 0))
             loss = torch.mean(mask)
 
@@ -73,21 +97,7 @@ class WeightedMSELoss(torch.nn.MSELoss):
 
         return loss
 
-    def forward(
-        self,
-        lsds_prediction,
-        lsds_target,
-        lsds_weights,
-        affs_prediction,
-        affs_target,
-        affs_weights,
-    ):
-
-        # calc each loss and combine
-        loss1 = self._calc_loss(lsds_prediction, lsds_target, lsds_weights)
-        loss2 = self._calc_loss(affs_prediction, affs_target, affs_weights)
-
-        return loss1 + loss2
+####
 
 
 
@@ -105,9 +115,9 @@ def main():
     raw = gp.ArrayKey("RAW")
     gt = gp.ArrayKey("GROUND_TRUTH")
     fg = gp.ArrayKey("FOREGROUND")
-    gt_lsds = gp.ArrayKey('GT_LSDS')
-    lsds_weights = gp.ArrayKey('LSDS_WEIGHTS')
-    pred_lsds = gp.ArrayKey('PRED_LSDS')
+    # gt_lsds = gp.ArrayKey('GT_LSDS')
+    # lsds_weights = gp.ArrayKey('LSDS_WEIGHTS')
+    # pred_lsds = gp.ArrayKey('PRED_LSDS')
     gt_affs = gp.ArrayKey('GT_AFFS')
     affs_weights = gp.ArrayKey('AFFS_WEIGHTS')
     pred_affs = gp.ArrayKey('PRED_AFFS')
@@ -139,12 +149,12 @@ def main():
 
     normalize_raw = gp.Normalize(raw)
 
-    shape_node = AddLocalShapeDescriptor(
-        gt,
-        gt_lsds,
-        lsds_mask=lsds_weights,
-        sigma=1500,
-        downsample=4)
+    # shape_node = AddLocalShapeDescriptor(
+    #     gt,
+    #     gt_lsds,
+    #     lsds_mask=lsds_weights,
+    #     sigma=1500,
+    #     downsample=4)
     
     affinity_node = gp.AddAffinities(
         affinity_neighborhood=[
@@ -207,7 +217,7 @@ def main():
     pipeline += noise_augment
     # pipeline += gp.Reject(mask=fg, min_masked=0.1)
     # pipeline += gp.GrowBoundary(gt)
-    pipeline += shape_node
+    # pipeline += shape_node
     pipeline += affinity_node
     pipeline += balance_node
     
@@ -221,24 +231,24 @@ def main():
         model,
         loss,
         optimizer,
-        log_dir = '/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_exp3/logs/', #/mnt/efs/shared_data/hack/lsd/lsd_exp2/logs/
+        log_dir = '/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_norm3000_exp5/logs/', #/mnt/efs/shared_data/hack/lsd/lsd_exp2/logs/
         log_every = 1,
-        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_exp3/first_try", # "/mnt/efs/shared_data/hack/lsd/lsd_exp2/first_try",
+        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_norm3000_exp5/first_try", # "/mnt/efs/shared_data/hack/lsd/lsd_exp2/first_try",
         save_every = 100, 
         inputs={
             'input': raw
         },
         outputs={
-            0: pred_lsds,
-            1: pred_affs
+            0: pred_affs,
+            # 1: pred_affs
         },
         loss_inputs={
-            0: pred_lsds,
-            1: gt_lsds,
-            2: lsds_weights,
-            3: pred_affs,
-            4: gt_affs,
-            5: affs_weights
+            0: pred_affs,
+            1: gt_affs,
+            2: affs_weights,
+            # 3: pred_affs,
+            # 4: gt_affs,
+            # 5: affs_weights
         })
 
     pipeline += gp.Snapshot({
@@ -255,7 +265,7 @@ def main():
             gt_affs: np.float32
         },
         every=50,
-        output_filename='/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_exp3/snapshot/batch_{iteration}.zarr') # '/mnt/efs/shared_data/hack/lsd/lsd_exp2/snapshot/batch_{iteration}.zarr')
+        output_filename='/mnt/efs/shared_data/hack/lsd/mjs_onlyaffs_norm3000_exp5/snapshot/batch_{iteration}.zarr') # '/mnt/efs/shared_data/hack/lsd/lsd_exp2/snapshot/batch_{iteration}.zarr')
         #additional_request=snapshot_request)
     pipeline += gp.PrintProfilingStats(every=5)
  
@@ -269,9 +279,9 @@ def main():
             request.add(raw, output_shape*voxels)
             request.add(gt, output_shape*voxels)
             request.add(fg, output_shape*voxels)
-            request.add(gt_lsds, output_shape*voxels)
-            request.add(lsds_weights, output_shape*voxels)
-            request.add(pred_lsds, output_shape*voxels)
+            # request.add(gt_lsds, output_shape*voxels)
+            # request.add(lsds_weights, output_shape*voxels)
+            # request.add(pred_lsds, output_shape*voxels)
             request.add(gt_affs, output_shape*voxels)
             request.add(affs_weights, output_shape*voxels)
             request.add(pred_affs, output_shape*voxels)

@@ -123,7 +123,7 @@ def main():
 
     noise_augment = gp.NoiseAugment(raw, mode="poisson")
 
-    normalize_raw = gp.Normalize(raw)
+    #normalize_raw = gp.Normalize(raw)
 
     # shape_node = AddLocalShapeDescriptor(
     #     gt,
@@ -161,7 +161,7 @@ def main():
                     fg: gp.ArraySpec(interpolatable=False, voxel_size=voxels),
                 },
             )
-             + gp.Normalize(raw) + gp.RandomLocation(min_masked=0.1, mask=fg, )
+             + gp.Normalize(raw, factor=1/3000) + gp.RandomLocation(min_masked=0.1, mask=fg, )
             for fov in fovs
         )
         
@@ -205,9 +205,9 @@ def main():
         model,
         loss,
         optimizer,
-        log_dir = '/mnt/efs/shared_data/hack/lsd/aff_exp1/logs/',
+        log_dir = '/mnt/efs/shared_data/hack/lsd/aff_exp2/logs/',
         log_every = 1,
-        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/aff_exp1/just_affs",
+        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs",
         save_every = 100, 
         inputs={
             'input': raw
@@ -233,7 +233,7 @@ def main():
             gt_affs: np.float32
         },
         every=50,
-        output_filename='/mnt/efs/shared_data/hack/lsd/aff_exp1/snapshot/newbatch_{iteration}.zarr')
+        output_filename='/mnt/efs/shared_data/hack/lsd/aff_exp2/snapshot/newbatch_{iteration}.zarr')
         #additional_request=snapshot_request)
     pipeline += gp.PrintProfilingStats(every=5)
  

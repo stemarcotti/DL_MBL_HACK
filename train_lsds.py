@@ -41,7 +41,7 @@ class MtlsdModel(torch.nn.Module):
           padding=padding)
 
         # create lsd and affs heads
-        self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
+       # self.lsd_head = ConvPass(num_fmaps, 10, [[1, 1, 1]], activation='Sigmoid')
         self.aff_head = ConvPass(num_fmaps, 3, [[1, 1, 1]], activation='Sigmoid')
 
     def forward(self, input):
@@ -50,7 +50,7 @@ class MtlsdModel(torch.nn.Module):
         z = self.unet(input)
 
         # pass output through heads
-        lsds = self.lsd_head(z)
+        #lsds = self.lsd_head(z)
         affs = self.aff_head(z)
 
         return lsds, affs
@@ -94,11 +94,15 @@ class WeightedMSELoss(torch.nn.MSELoss):
 def main():
     # Config for data
     load_path = ['/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
-             '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr']
-    fov_list = [[0,1,2], [1,2,3]]
-    output_shape = gp.Coordinate((20, 128, 128))
+             '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr',
+             '/mnt/efs/shared_data/hack/data/og_cellpose/og_cellpose_raw.zarr'
+             ]
+    fov_list = [[0,1], [0,1], range(18)]
+    output_shape = gp.Coordinate((8, 88, 88))
+    input_shape = gp.Coordinate((24, 128, 128))
     stack_size = 16
     voxels = gp.Coordinate((250, 75, 75))  
+
 
     # Array keys
     raw = gp.ArrayKey("RAW")
@@ -122,10 +126,11 @@ def main():
     simple_augment = gp.SimpleAugment(mirror_probs=[0, 0, 0], transpose_probs=[0, 0, 0])
 
     elastic_augment = gp.ElasticAugment(
-        control_point_spacing=(30, 30, 30),
-        jitter_sigma=(1.0, 1.0, 1.0),
+        control_point_spacing=(7, 30, 30),
+        jitter_sigma=(1.0, 6.0, 6.0),
         rotation_interval=(0, math.pi / 2),
         spatial_dims=3,
+        subsample=8,
     )
 
     # signal augmentations
@@ -137,12 +142,12 @@ def main():
 
     normalize_raw = gp.Normalize(raw)
 
-    shape_node = AddLocalShapeDescriptor(
-        gt,
-        gt_lsds,
-        lsds_mask=lsds_weights,
-        sigma=1500,
-        downsample=2)
+    # shape_node = AddLocalShapeDescriptor(
+    #     gt,
+    #     gt_lsds,
+    #     lsds_mask=lsds_weights,
+    #     sigma=1500,
+    #     downsample=4)
     
     affinity_node = gp.AddAffinities(
         affinity_neighborhood=[
@@ -173,9 +178,10 @@ def main():
                     fg: gp.ArraySpec(interpolatable=False, voxel_size=voxels),
                 },
             )
-             + gp.Normalize(raw) + gp.RandomLocation()
+             + gp.Normalize(raw) + gp.RandomLocation(min_masked=0.1, mask=fg, )
             for fov in fovs
         )
+        
         #source = source
         #source += normalize_raw
         #source += gp.RandomLocation()
@@ -183,7 +189,8 @@ def main():
             sources = source
         else:
             sources = sources + source
-
+    
+    
 
 
     # Configure model, loss, etc
@@ -196,12 +203,12 @@ def main():
     #pipeline += normalize_raw
     #pipeline += random_location
     pipeline += simple_augment
-    #pipeline += elastic_augment
+    pipeline += elastic_augment
     pipeline += intensity_augment
     pipeline += noise_augment
-    pipeline += gp.Reject(mask=fg, min_masked=0.1)
-    pipeline += gp.GrowBoundary(gt)
-    pipeline += shape_node
+    #pipeline += gp.Reject(mask=fg, min_masked=0.1)
+    #pipeline += gp.GrowBoundary(gt)
+    #pipeline += shape_node
     pipeline += affinity_node
     pipeline += balance_node
     
@@ -215,24 +222,24 @@ def main():
         model,
         loss,
         optimizer,
-        log_dir = '/mnt/efs/shared_data/hack/lsd/lsd_exp1/logs/',
+        log_dir = '/mnt/efs/shared_data/hack/lsd/aff_exp1/logs/',
         log_every = 1,
-        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/lsd_exp1/first_try",
+        checkpoint_basename = "/mnt/efs/shared_data/hack/lsd/aff_exp1/just_affs",
         save_every = 100, 
         inputs={
             'input': raw
         },
         outputs={
-            0: pred_lsds,
-            1: pred_affs
+            #0: pred_lsds,
+            0: pred_affs
         },
         loss_inputs={
-            0: pred_lsds,
-            1: gt_lsds,
-            2: lsds_weights,
-            3: pred_affs,
-            4: gt_affs,
-            5: affs_weights
+           # 0: pred_lsds,
+            #1: gt_lsds,
+            #2: lsds_weights,
+            0: pred_affs,
+            1: gt_affs,
+            2: affs_weights
         })
 
     pipeline += gp.Snapshot({
@@ -240,14 +247,16 @@ def main():
             gt: "gt",
             gt_affs: 'gt_affinities',
             pred_affs: 'pred_affinities',
-            fg:  "fg_mask"
+            fg:  "fg_mask", 
+          #  pred_lsds: 'pred_lsds',
+           # gt_lsds: 'gt_lsds',
         },
         dataset_dtypes={
             gt: np.uint64,
             gt_affs: np.float32
         },
         every=50,
-        output_filename='/mnt/efs/shared_data/hack/lsd/lsd_exp1/snapshot/batch_{iteration}.zarr')
+        output_filename='/mnt/efs/shared_data/hack/lsd/aff_exp1/snapshot/newbatch_{iteration}.zarr')
         #additional_request=snapshot_request)
     pipeline += gp.PrintProfilingStats(every=5)
  
@@ -255,17 +264,17 @@ def main():
 
     # Build pipeline with training loop 
     with gp.build(pipeline):
-        for i in range(20):
+        while True:
             request = gp.BatchRequest()
-            request[raw] = gp.Roi((0, 0, 0), output_shape*voxels)
-            request[gt] = gp.Roi((0, 0, 0), output_shape*voxels)
-            request[fg] = gp.Roi((0, 0, 0), output_shape*voxels)
-            request[gt_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
-            request[lsds_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-            request[pred_lsds]= gp.Roi((0, 0, 0), output_shape*voxels)
-            request[gt_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
-            request[affs_weights]= gp.Roi((0, 0, 0), output_shape*voxels)
-            request[pred_affs]= gp.Roi((0, 0, 0), output_shape*voxels)
+            request.add(raw, input_shape*voxels)
+            request.add(gt, output_shape*voxels)
+            request.add(fg, output_shape*voxels)           
+            #request.add(gt_lsds, output_shape*voxels)
+            #request.add(lsds_weights, output_shape*voxels)
+            #request.add(pred_lsds, output_shape*voxels)
+            request.add(gt_affs, output_shape*voxels)
+            request.add(affs_weights, output_shape*voxels)
+            request.add(pred_affs, output_shape*voxels)
             batch = pipeline.request_batch(request)
             snapshot_request = gp.BatchRequest({
                 gt_affs: request[gt_affs]
@@ -283,7 +292,7 @@ def get_model():
     ksd = [[(1,3,3), (1,3,3)],[(3,3,3), (3,3,3)],[(3,3,3), (3,3,3)]]
     ksu = [[(3,3,3), (3,3,3)], [(3,3,3), (3,3,3)]]
     constant_upsample = True
-    padding="same"
+    padding="valid"
     model = MtlsdModel(
         in_channels,
         num_fmaps,
@@ -309,5 +318,5 @@ if __name__ == "__main__":
     #out1,out2 = model(inp)
     #print(out1.shape, out2.shape)
     # print(out.shape)
-    # summary(model.cuda(), (1, 20,  128, 128))
+    #summary(model.cuda(), (1, 20,  128, 128))
 

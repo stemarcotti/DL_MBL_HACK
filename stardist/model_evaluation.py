@@ -33,7 +33,7 @@ lbl_cmap = random_label_cmap()
 # mamba env create -f stardist/extras/cuda_setup_conda/stardist_cuda_11.0.yml -n stardist
 #%%
 # load test data
-in_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902'
+in_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902_on_denoised'
 
 X = natsorted(glob(os.path.join(in_path, 'raw/*')))
 Y = natsorted(glob(os.path.join(in_path, 'gt/*')))
@@ -45,7 +45,15 @@ Y_pred = list(map(imread,Y_pred))
 
 #%%
 # compute stats
-stats = matching_dataset(Y, Y_pred, thresh=0.7)
+stats = matching_dataset(Y, Y_pred, thresh=0.7,by_image=False)
 print(stats)
+
+# %%
+for i in range(len(Y)):
+    stats_by_image = matching(Y[i], Y_pred[i], thresh=0.7)
+    print(f"{i}")
+    print(stats_by_image)
+    
+
 
 # %%

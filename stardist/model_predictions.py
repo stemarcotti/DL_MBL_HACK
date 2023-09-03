@@ -28,9 +28,9 @@ lbl_cmap = random_label_cmap()
 
 #%%
 # load test data
-X1 = natsorted(glob('/mnt/efs/shared_data/hack/data/og_cellpose/raw/*.TIF'))
-X2 = natsorted(glob('/mnt/efs/shared_data/hack/data/20230811/raw/*.tiff'))
-X3 = natsorted(glob('/mnt/efs/shared_data/hack/data/20230504/raw/*.tiff'))
+X1 = natsorted(glob('/mnt/efs/shared_data/hack/data/og_cellpose/denoised/*.TIF'))
+X2 = natsorted(glob('/mnt/efs/shared_data/hack/data/20230811/denoised/*.tiff'))
+X3 = natsorted(glob('/mnt/efs/shared_data/hack/data/20230504/denoised/*.tiff'))
 
 Y1 = natsorted(glob('/mnt/efs/shared_data/hack/data/og_cellpose/fixed_labels/*Manual_Mask_median.tiff'))
 Y2 = natsorted(glob('/mnt/efs/shared_data/hack/data/20230811/fixed_labels/*_Manual_Mask.tiff'))
@@ -86,10 +86,10 @@ Y_pred = [model.predict_instances(x, n_tiles=(1,2,2), show_tile_progress=False)[
               for x in tqdm(X_test)]
 #%%
 # save output
-# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/raw'
-# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/gt'
-# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/pred'
-out_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902_on_denoised/raw'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902_on_denoised/gt'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902_on_denoised/pred'
+out_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902_on_denoised'
 os.system(f"chmod -R 777 {out_path}")
 for i in range(len(X_test)):
     imwrite(os.path.join(out_path, f'raw/raw{i}.tiff'),X_test[i]) 

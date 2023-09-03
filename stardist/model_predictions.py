@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib
 matplotlib.rcParams["image.interpolation"] = 'none'
 import matplotlib.pyplot as plt
-%matplotlib inline
-%config InlineBackend.figure_format = 'retina'
+#%matplotlib inline
+#%config InlineBackend.figure_format = 'retina'
 
 import os
 
@@ -86,12 +86,12 @@ Y_pred = [model.predict_instances(x, n_tiles=(1,2,2), show_tile_progress=False)[
               for x in tqdm(X_test)]
 #%%
 # save output
-!mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/raw'
-!mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/gt'
-!mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/pred'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/raw'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/gt'
+# !mkdir '/mnt/efs/shared_data/hack/stardist/stardist20230902/pred'
 out_path = '/mnt/efs/shared_data/hack/stardist/stardist20230902'
 os.system(f"chmod -R 777 {out_path}")
-for i  in len(X_test):
+for i in range(len(X_test)):
     imwrite(os.path.join(out_path, f'raw/raw{i}.tiff'),X_test[i]) 
     imwrite(os.path.join(out_path, f'gt/gt{i}.tiff'),Y_test[i]) 
     imwrite(os.path.join(out_path, f'pred/pred{i}.tiff'),Y_pred[i]) 

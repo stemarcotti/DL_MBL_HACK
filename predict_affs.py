@@ -1,4 +1,4 @@
-#%%
+# %%
 import gunpowder as gp
 import h5py
 import io
@@ -27,8 +27,8 @@ input_size = input_shape * voxel_size
 output_size = output_shape * voxel_size
 
 # total roi of image to predict on
-total_roi = gp.Coordinate((64, 640, 640))*voxel_size
-     
+total_roi = gp.Coordinate((64, 640, 640)) * voxel_size
+
 
 stack_size = 16
 
@@ -50,7 +50,9 @@ def predict(checkpoint, raw_file, raw_dataset):
     context = (input_size - output_size) / 2
 
     source = gp.ZarrSource(
-        raw_file, {raw: raw_dataset}, {raw: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)}
+        raw_file,
+        {raw: raw_dataset},
+        {raw: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)},
     )
 
     with gp.build(source):
@@ -75,18 +77,17 @@ def predict(checkpoint, raw_file, raw_dataset):
     scan = gp.Scan(scan_request)
 
     pipeline = source
-    pipeline += gp.Normalize(raw)
+    pipeline += gp.Normalize(raw, factor=1/3000)
 
     # raw shape = h,w
 
     pipeline += gp.Unsqueeze([raw])
 
     # raw shape = c,h,w
-    #pipeline += gp.Unsqueeze([raw])
+    # pipeline += gp.Unsqueeze([raw])
     pipeline += gp.Stack(1)
 
     # raw shape = b,c,h,w
-
 
     pipeline += predict
     pipeline += scan
@@ -105,7 +106,7 @@ def predict(checkpoint, raw_file, raw_dataset):
     predict_request = gp.BatchRequest()
 
     # this lets us know to process the full image. we will scan over it until it is done
-    #predict_request.add(raw, input_size)
+    # predict_request.add(raw, input_size)
     # predict_request.add(pred_affs, output_size)
     predict_request.add(raw, total_input_roi.get_end())
     predict_request.add(pred_affs, total_output_roi.get_end())
@@ -115,8 +116,6 @@ def predict(checkpoint, raw_file, raw_dataset):
     return batch[raw].data, batch[pred_affs].data
 
 
-
-
 def load_ground_truth(raw_file, gt_dataset):
     gt = gp.ArrayKey("GT")
     scan_request = gp.BatchRequest()
@@ -124,16 +123,16 @@ def load_ground_truth(raw_file, gt_dataset):
 
     # Set the zarr source for ground truth
     source = gp.ZarrSource(
-        raw_file, 
-        {gt: gt_dataset}, 
-        {gt: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)}
+        raw_file,
+        {gt: gt_dataset},
+        {gt: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)},
     )
 
     with gp.build(source):
         total_input_roi = source.spec[gt].roi
 
     pipeline = source
-    #pipeline += gp.Normalize(gt)  # Normalize if required; can be removed if not needed
+    # pipeline += gp.Normalize(gt)  # Normalize if required; can be removed if not needed
 
     gt_request = gp.BatchRequest()
     gt_request.add(gt, total_input_roi.get_end())
@@ -144,19 +143,18 @@ def load_ground_truth(raw_file, gt_dataset):
     return batch[gt].data
 
 
+# %%
 
-#%% 
+checkpoint = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs_checkpoint_11400"
 
-checkpoint = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs_checkpoint_3300"
 
 def save_to_zarr(data, folder, filename, dataset):
     output_path = os.path.join(folder, filename + ".zarr")
-    with zarr.open(output_path, mode='a') as f:
+    with zarr.open(output_path, mode="a") as f:
         # Check if dataset exists and delete
         if dataset in f:
             del f[dataset]
         f[dataset] = data
-
 
 
 output_folder = "/mnt/efs/shared_data/hack/lsd/aff_LB"
@@ -167,19 +165,19 @@ if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
 load_path = [
-    '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
-    '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr',
-    '/mnt/efs/shared_data/hack/data/og_cellpose/og_cellpose_raw.zarr'
+    "/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr",
+    "/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr",
+    "/mnt/efs/shared_data/hack/data/og_cellpose/og_cellpose_raw.zarr",
 ]
 fov_list = [range(5), range(4), range(26)]
 
 for path, fovs in zip(load_path, fov_list):
     for fov in fovs:
         raw_dataset = f"fov{fov}/raw"
-        gt_dataset = f"fov{fov}/gt"  # Adjust as per your dataset structure
+        gt_dataset = f"fov{fov}/gt" 
 
         raw, pred_affs = predict(checkpoint, path, raw_dataset)
-        
+
         # Assuming you have a method to load GT similar to predict
         gt_data = load_ground_truth(path, gt_dataset)
 
@@ -190,15 +188,6 @@ for path, fovs in zip(load_path, fov_list):
         save_to_zarr(raw, output_folder, filename, "raw")
         save_to_zarr(pred_affs, output_folder, filename, "pred_affs")
         save_to_zarr(gt_data, output_folder, filename, "gt")
-
-
-
-
-
-
-
-
-
 
 
 # raw_file = "/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr"
@@ -236,7 +225,6 @@ for path, fovs in zip(load_path, fov_list):
 
 # plt.tight_layout()
 # plt.show()
-
 
 
 # %%

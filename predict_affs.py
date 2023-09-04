@@ -115,27 +115,128 @@ def predict(checkpoint, raw_file, raw_dataset):
     return batch[raw].data, batch[pred_affs].data
 
 
+
+
+def load_ground_truth(raw_file, gt_dataset):
+    gt = gp.ArrayKey("GT")
+    scan_request = gp.BatchRequest()
+    scan_request.add(gt, input_size)
+
+    # Set the zarr source for ground truth
+    source = gp.ZarrSource(
+        raw_file, 
+        {gt: gt_dataset}, 
+        {gt: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size)}
+    )
+
+    with gp.build(source):
+        total_input_roi = source.spec[gt].roi
+
+    pipeline = source
+    #pipeline += gp.Normalize(gt)  # Normalize if required; can be removed if not needed
+
+    gt_request = gp.BatchRequest()
+    gt_request.add(gt, total_input_roi.get_end())
+
+    with gp.build(pipeline):
+        batch = pipeline.request_batch(gt_request)
+
+    return batch[gt].data
+
+
+
 #%% 
 
-checkpoint = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs_checkpoint_2400"
-raw_file = "/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr"
-raw_dataset = "fov2/raw"
+checkpoint = "/mnt/efs/shared_data/hack/lsd/aff_exp2/just_affs_checkpoint_3300"
 
-raw, pred_affs = predict(checkpoint, raw_file, raw_dataset)
+def save_to_zarr(data, folder, filename, dataset):
+    output_path = os.path.join(folder, filename + ".zarr")
+    with zarr.open(output_path, mode='a') as f:
+        # Check if dataset exists and delete
+        if dataset in f:
+            del f[dataset]
+        f[dataset] = data
 
-#%%
 
 
-fig, axes = plt.subplots(
-            1,
-            2,
-            figsize=(20, 6),
-            sharex=True,
-            sharey=True,
-            squeeze=False)
+output_folder = "/mnt/efs/shared_data/hack/lsd/aff_LB"
 
-# view predictions (for lsds we will just view the mean offset component)
-axes[0][0].imshow(raw, cmap='gray')
-axes[0][1].imshow(np.squeeze(pred_affs[0]), cmap='jet')
+
+# Ensure the output folder exists
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+load_path = [
+    '/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr',
+    '/mnt/efs/shared_data/hack/data/20230504/20230504_raw.zarr',
+    '/mnt/efs/shared_data/hack/data/og_cellpose/og_cellpose_raw.zarr'
+]
+fov_list = [range(5), range(4), range(26)]
+
+for path, fovs in zip(load_path, fov_list):
+    for fov in fovs:
+        raw_dataset = f"fov{fov}/raw"
+        gt_dataset = f"fov{fov}/gt"  # Adjust as per your dataset structure
+
+        raw, pred_affs = predict(checkpoint, path, raw_dataset)
+        
+        # Assuming you have a method to load GT similar to predict
+        gt_data = load_ground_truth(path, gt_dataset)
+
+        # Derive a filename from the path
+        filename = os.path.basename(path).replace(".zarr", "") + f"_fov{fov}"
+
+        # Save raw, ground truth, and prediction as zarrs in the output folder
+        save_to_zarr(raw, output_folder, filename, "raw")
+        save_to_zarr(pred_affs, output_folder, filename, "pred_affs")
+        save_to_zarr(gt_data, output_folder, filename, "gt")
+
+
+
+
+
+
+
+
+
+
+
+# raw_file = "/mnt/efs/shared_data/hack/data/20230811/20230811_raw.zarr"
+# raw_dataset = "fov4/raw"
+
+# raw, pred_affs = predict(checkpoint, raw_file, raw_dataset)
+
+# #%%
+
+# print("Shape of 'raw':", raw.shape)
+# print("Shape of 'pred_affs ':", pred_affs.shape)
+# %%
+# #Plotting of pred affinities
+
+# # Take a slice in the middle along the depth (change index for different slices)
+# raw_slice = raw[0, 0, 32, :, :]
+# pred_slices = [pred_affs[0, i, 28, :, :] for i in range(3)]
+# sum_pred_slice = np.sum(pred_affs[0], axis=0)[28, :, :]
+
+# # Plotting
+# fig, axes = plt.subplots(1, 5, figsize=(18, 12))
+
+# axes[0].imshow(raw_slice, cmap='gray')
+# axes[0].set_title("Raw")
+
+# for i, pred_slice in enumerate(pred_slices):
+#     axes[i+1].imshow(pred_slice, cmap='viridis', vmax=0.01)
+#     axes[i+1].set_title(f"Pred Channel {i+1}")
+
+# axes[4].imshow(sum_pred_slice, cmap='viridis', vmax=0.01)
+# axes[4].set_title("Sum of Pred")
+
+# for ax in axes:
+#     ax.axis('off')
+
+# plt.tight_layout()
+# plt.show()
+
+
 
 # %%

@@ -1,3 +1,5 @@
 sandbox/
+*.pyc
 model_checkpoint*
 stardist/.ipynb*
+

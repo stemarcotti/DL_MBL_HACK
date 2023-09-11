@@ -49,6 +49,7 @@ for file in range(n_files):
     f[f'fov{file}/fg_mask'] = (gt>0).astype('uint8')
     f[f'fov{file}/fg_mask'].attrs['resolution'] = (0.25, 0.075, 0.075) # [um]
     os.system(f"chmod -R 777 {store_path}")
+
 # %%
 
 # %%
